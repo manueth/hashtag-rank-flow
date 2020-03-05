@@ -1,0 +1,137 @@
+<!doctype html>
+<html>
+  <head>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        padding: 5vw;
+        margin: 0px;
+      }
+      #container {
+        display: block;
+        width: 100%;
+        height: 80vh;
+        max-width: 800px;
+        max-height: 400px;
+        margin: auto;
+        border: thin solid grey;
+        background: #FFFFFF;
+      }
+    </style>
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+    <script src="rankflow.js"></script>
+    <script>
+      // helpers for preprocessing data
+      function groupYearly(data) {
+        let groups = {};
+        for (let d of data) {
+          d.group = d.date.getFullYear();
+          if (!(d.group in groups)) {
+            groups[d.group] = Object.keys(groups).length;
+          }
+        }
+        return data;
+      }
+
+      function rank(data, group) {
+        data = group(data);
+        let counts = {};
+        for (let d of data) {
+          if (!(d.group in counts)) {
+            counts[d.group] = {};
+          }
+          if (!(d.hashtag in counts[d.group])) {
+            d.count = 0;
+            counts[d.group][d.hashtag] = d;
+          } else {
+            counts[d.group][d.hashtag].value += d.value;
+          }
+          counts[d.group][d.hashtag].count += 1;
+        }
+        let ranks = [];
+        for (let group in counts) {
+          let hashtags = Object.values(counts[group]);
+          hashtags = hashtags.sort((a, b) => {
+            return b.count > a.count ? 1 : -1;
+          });
+          for (let i=0; i<hashtags.length; i++) {
+            let hashtag = hashtags[i];
+            hashtag.rank = i + 1;
+            hashtag.value /= hashtag.count;
+            ranks.push(hashtag);
+          }
+        }
+        return ranks;
+      }
+
+      // [ …
+      //  { hashtag: string, group: string|number, count: number }
+      // … ]
+      function table(data) {
+        let groups = {};
+        for (let item of data) {
+          if (!(item.group in groups)) {
+            groups[item.group] = [];
+          }
+          groups[item.group].push(item);
+        }
+        let groupNames = Object.keys(groups).sort();
+        let table = {};
+        for (let group of groupNames) {
+          table[group] = groups[group].sort((a,b) => a.count > b.count);
+        }
+        return table;
+      }
+
+      // helpers to produce test data
+      function random(min, max, zero=false, dist=x=>x) {
+        let frac = dist(Math.random());
+        let num = Math.round(frac * (max - min)) + min;
+        if (zero) {
+          num = num + '';
+          let len = (max + '').length;
+          while (num.length < len) {
+            num = 0 + num;
+          }
+        }
+        return num;
+      }
+
+      function randomItem(items, dist=x=>Math.pow(x,1/3)) {
+        return items[this.random(0, items.length - 1, false, dist)];
+      }
+
+      function generateSample() {
+        let data = [];
+        for (let i=0; i<1000; i++) {
+          data.push({
+            hashtag: this.randomItem('lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua laborum'.split(' ')),
+            date: new Date(this.random(2015,2020) + '-' + this.random(1,12,true) + '-' + this.random(1,28,true)),
+            value: Math.random()
+          });
+        }
+        return data;
+      }
+    </script>
+  </head>
+  <body>
+    <div id="container"></div>
+    <script>
+      generateRankData = () => {
+        let data = this.generateSample();
+        let grouped = this.rank(data, this.groupYearly);
+        let ranking = this.table(grouped);
+        return ranking;
+      }
+      let container = document.getElementById("container");
+      let ranking = generateRankData();
+      this.createRankFlow(container, ranking);
+      setInterval(() => {
+        ranking = generateRankData();
+        this.updateRankFlow(container, ranking);
+      }, 2000);
+    </script>
+  </body>
+</html>
